@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: jdbc:oracle:${DB_DESENV_SERVER:thin:@oracle.fiap.com.br}:${DB_DESENV_PORT:1521}:${DB_DESENV_NAME:ORCL}
+    username: ${DB_DESENV_USERNAME:RM551377}
+    password: ${DB_DESENV_PASSWORD:211204}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
