@@ -1,5 +1,6 @@
 server:
   port: 80
+
 spring:
   thymeleaf:
     check-template-location: false
@@ -9,3 +10,20 @@ spring:
     multipart:
       max-file-size: 1GB
       max-request-size: 1GB
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: "*"
+    endpoint:
+      health:
+        show-details: always
+
+google:
+  api:
+    key: AIzaSyBMrNd8C3B5dCBevyM6kez4UTdH2GaL4o4  # Chave da API

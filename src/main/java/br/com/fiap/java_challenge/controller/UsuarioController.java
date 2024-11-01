@@ -7,6 +7,7 @@ import br.com.fiap.java_challenge.entity.Estabelecimento;
 import br.com.fiap.java_challenge.entity.TipoEstabelecimento;
 import br.com.fiap.java_challenge.entity.Usuario;
 import br.com.fiap.java_challenge.service.EstabelecimentoService;
+import br.com.fiap.java_challenge.service.GeradorItinerarioIA;
 import br.com.fiap.java_challenge.service.UsuarioService;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
@@ -31,6 +32,9 @@ public class UsuarioController {
 
     @Autowired
     private EstabelecimentoService estabelecimentoService;
+
+    @Autowired
+    private GeradorItinerarioIA geradorItinerarioIA;
 
     @GetMapping
     public ModelAndView listarUsuarios(Usuario usuario) {
@@ -64,6 +68,10 @@ public class UsuarioController {
             return new ModelAndView("usuario/criar");
         }
         var entity = usuarioService.toEntity(usuarioRequest);
+
+        String itinerario = geradorItinerarioIA.gerarItinerario(usuarioRequest.preferenciaViagem());
+        entity.setItinerario(itinerario);
+
         var saved = usuarioService.save(entity);
 
         return new ModelAndView("redirect:/usuarios");
@@ -213,6 +221,19 @@ public class UsuarioController {
         usuario.getEstabelecimentos().removeIf(e -> e.getId().equals(estabelecimentoId));
         usuarioService.save(usuario);
         return "redirect:/usuarios/" + usuarioId + "/estabelecimentos";
+    }
+
+    @GetMapping("/{id}/itinerario")
+    public ModelAndView verItinerario(@PathVariable("id") Long id) {
+        ModelAndView mv = new ModelAndView("usuario/itinerario");
+        Usuario usuario = usuarioService.findById(id);
+        if (usuario != null && usuario.getItinerario() != null) {
+            mv.addObject("itinerario", usuario.getItinerario());
+        } else {
+            mv.addObject("itinerario", "Nenhum itinerário gerado para este usuário.");
+        }
+        mv.addObject("usuarioId", id);
+        return mv;
     }
 
 }

@@ -34,6 +34,9 @@ public class Usuario {
     @Column(name = "PASSWORD", nullable = false)
     private String password;
 
+    @Column(name = "ITINERARIO", columnDefinition = "CLOB") // CLOB para textos grandes
+    private String itinerario;
+
     @OneToOne(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinColumn(name = "PESSOA", referencedColumnName = "ID_PESSOA", foreignKey = @ForeignKey(name = "FK_USUARIO_PESSOA"))
     private Pessoa pessoa;

@@ -56,6 +56,8 @@ public class UsuarioService implements ServiceDTO<Usuario, UsuarioRequest, Usuar
                 .pessoa(pessoa)
                 .preferenciaViagem(preferenciaViagem)
                 .build();
+
+
     }
 
     @Override
@@ -129,4 +131,5 @@ public class UsuarioService implements ServiceDTO<Usuario, UsuarioRequest, Usuar
                 .preferenciaViagem(preferenciaRequest)
                 .build();
     }
+
 }
