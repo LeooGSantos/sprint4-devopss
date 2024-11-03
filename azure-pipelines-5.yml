@@ -1,0 +1,74 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
+  MAVEN_OPTS: '-Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)'
+
+stages:
+- stage: Build
+  jobs:
+  - job: MavenBuild
+    steps:
+    - task: JavaToolInstaller@0
+      inputs:
+        versionSpec: '17'
+        jdkArchitecture: 'x64'
+        jdkSource: 'toolCache'
+    - task: Cache@2
+      inputs:
+        key: 'maven | "$(Agent.OS)" | pom.xml'
+        restoreKeys: 'maven | "$(Agent.OS)"'
+        path: $(MAVEN_CACHE_FOLDER)
+    - task: Maven@3
+      inputs:
+        mavenPomFile: 'pom.xml'
+        mavenOptions: $(MAVEN_OPTS)
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '17'
+        goals: 'clean package'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(system.defaultworkingdirectory)/target'
+        Contents: '*.jar'
+        TargetFolder: $(Build.ArtifactStagingDirectory)
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: $(Build.ArtifactStagingDirectory)
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+
+- stage: Deploy
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployJob
+    environment: YourEnvironmentName # Replace with your environment name
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: Docker@2
+            inputs:
+              containerRegistry: 'Docker Hub'
+              repository: 'rabbitmq'
+              tag: '4.0-management'
+              ports: |
+                5672:5672
+                15672:15672
+              runInBackground: true
+          - task: Bash@3
+            env:
+              SPRING_DATASOURCE_URL: jdbc:oracle:thin:@$(DB_HOST):$(DB_PORT):$(DB_SERVICE_NAME)
+              SPRING_DATASOURCE_USERNAME: $(DB_USER)
+              SPRING_DATASOURCE_PASSWORD: $(DB_PASSWORD)
+              GOOGLE_API_KEY: $(googleApiKey) # Referencing the secret variable
+            inputs:
+              targetType: 'inline'
+              script: |
+                java -jar $(Pipeline.Workspace)/**/*.jar &
