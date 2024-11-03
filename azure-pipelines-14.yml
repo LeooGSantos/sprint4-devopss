@@ -1,0 +1,96 @@
+trigger:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
+  MAVEN_OPTS: '-Dmaven.repo.local=$(MAVEN_CACHE_FOLDER) -Xmx3072m'
+
+stages:
+- stage: Build
+  jobs:
+  - job: MavenBuild
+    steps:
+    - task: JavaToolInstaller@0
+      inputs:
+        versionSpec: '17'
+        jdkArchitectureOption: 'x64'
+        jdkSourceOption: 'PreInstalled'  # Alterado de 'packaged' para 'PreInstalled'
+    
+    - task: Cache@2
+      displayName: 'Cache Maven packages'
+      inputs:
+        key: 'maven | "$(Agent.OS)" | pom.xml'
+        restoreKeys: 'maven | "$(Agent.OS)"'
+        path: $(MAVEN_CACHE_FOLDER)
+    
+    - task: Maven@3
+      displayName: 'Build com o Maven'
+      inputs:
+        mavenPomFile: 'pom.xml'
+        mavenOptions: $(MAVEN_OPTS)
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.17'
+        jdkArchitectureOption: 'x64'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        goals: 'package'
+    
+    - task: CopyFiles@2
+      displayName: 'Copiar JAR para o diretório de staging'
+      inputs:
+        SourceFolder: '$(System.DefaultWorkingDirectory)/target'
+        Contents: '*.jar'
+        TargetFolder: $(Build.ArtifactStagingDirectory)
+    
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publicar artefato: drop'
+      inputs:
+        PathtoPublish: $(Build.ArtifactStagingDirectory)
+        ArtifactName: 'drop'
+
+- stage: Deploy
+  displayName: 'Deploy da Aplicação'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployJob
+    displayName: 'Deploy para o servidor'
+    environment: DevOps-Sprint4
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: Docker@2
+            displayName: 'Iniciar RabbitMQ'
+            inputs:
+              containerRegistry: 'LeooGSantos'  # Nome da conexão do Docker Hub conforme mostrado na imagem
+              command: 'run'
+              arguments: '-d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:4.0-management'
+          
+          - task: DownloadBuildArtifacts@1
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              downloadPath: '$(System.ArtifactsDirectory)'
+          
+          - task: Bash@3
+            displayName: 'Executar aplicativo Spring Boot'
+            inputs:
+              targetType: 'inline'
+              script: |
+                # Aguardar o RabbitMQ iniciar
+                sleep 30
+                
+                # Executar a aplicação Spring Boot com as variáveis de ambiente
+                java -jar $(System.ArtifactsDirectory)/drop/*.jar \
+                  --spring.datasource.url=jdbc:oracle:thin:@$(DB_HOST):$(DB_PORT):$(DB_SERVICE_NAME) \
+                  --spring.datasource.username=$(DB_USER) \
+                  --spring.datasource.password=$(DB_PASSWORD) \
+                  --google.api.key=$(GOOGLE_API_KEY) &
+                
+                # Aguardar a aplicação iniciar
+                sleep 30
