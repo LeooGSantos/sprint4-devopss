@@ -1,0 +1,46 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
+  MAVEN_OPTS: '-Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)'
+
+stages:
+- stage: Build
+  # ... (código do estágio de build - igual aos exemplos anteriores)
+
+- stage: Deploy
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployJob
+    environment: DevOps-Sprint4  # Substitua "SeuAmbiente" pelo nome do seu ambiente
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: Docker@2
+            inputs:
+              connectionType: 'Azure Resource Manager'
+              azureSubscription: 'leozin1910' # Nome da sua conexão de serviço Docker Hub
+              azureContainerRegistry: 'leozin1910' # Nome da sua conexão de serviço Docker Hub
+              repository: 'rabbitmq'
+              tag: '4.0-management'
+              ports: |
+                5672:5672
+                15672:15672
+              runInBackground: true
+
+          - task: Bash@3
+            env:
+              SPRING_DATASOURCE_URL: jdbc:oracle:thin:@$(DB_HOST):$(DB_PORT):$(DB_SERVICE_NAME)
+              SPRING_DATASOURCE_USERNAME: $(DB_USER)
+              SPRING_DATASOURCE_PASSWORD: $(DB_PASSWORD)
+              GOOGLE_API_KEY: $(GOOGLE_API_KEY)
+            inputs:
+              targetType: 'inline'
+              script: |
+                java -jar $(Pipeline.Workspace)/**/*.jar &
