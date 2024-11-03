@@ -1,0 +1,56 @@
+trigger:
+- main  # ou o nome do seu branch principal
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  # Defina as variáveis necessárias, se houver
+  MAVEN_OPTS: "-Xmx1024m"
+
+stages:
+- stage: Build
+  displayName: 'Build Stage'
+  jobs:
+  - job: Build
+    displayName: 'Build Job'
+    steps:
+    - task: MavenAuthenticate@0
+      displayName: 'Authenticate Maven'
+      
+    - task: Maven@3
+      displayName: 'Maven Build'
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean package'
+        options: '-DskipTests=true'
+        publishJUnitResults: true
+        testResultsFiles: '**/target/surefire-reports/*.xml'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'target/*.jar'
+        ArtifactName: 'drop'
+
+- stage: RunDocker
+  displayName: 'Run Docker Stage'
+  jobs:
+  - job: RunDocker
+    displayName: 'Run RabbitMQ'
+    container: 'docker'
+    steps:
+    - script: |
+        echo "Starting RabbitMQ..."
+        docker run -it --rm --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:4.0-management
+      displayName: 'Run RabbitMQ Container'
+
+- stage: Deploy
+  displayName: 'Deploy Stage'
+  jobs:
+  - job: Deploy
+    displayName: 'Deploy Application'
+    steps:
+    - script: |
+        echo "Deploying application..."
+        java -jar target/TechPeach.jar
+      displayName: 'Run Application'
