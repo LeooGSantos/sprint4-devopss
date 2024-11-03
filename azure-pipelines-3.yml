@@ -1,0 +1,33 @@
+# azure-pipelines.yml
+
+trigger:
+- main  # ou a branch que você está utilizando
+
+pool:
+  vmImage: 'ubuntu-latest'  # Você pode usar outra imagem se preferir
+
+stages:
+- stage: Build
+  displayName: 'Build Stage'
+  jobs:
+  - job: Build
+    displayName: 'Build Job'
+    steps:
+    - task: JavaToolInstaller@0
+      inputs:
+        versionSpec: '17'  # Especifica que você precisa do JDK 17
+        jdkArchitectureOption: 'x64'
+        jdkSourceOption: 'JDKArchive'  # Especifica que a fonte do JDK é um arquivo de arquivo JDK
+        jdkDirectory: '$(JAVA_HOME)'
+
+    - task: MavenAuthenticate@0
+      displayName: 'Authenticate Maven'
+
+    - task: Maven@3
+      displayName: 'Maven Build'
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean package'
+        options: '-DskipTests=true'  # Você pode ajustar conforme necessário
+        publishJUnitResults: true
+        testResultsFiles: '**/target/surefire-reports/*.xml'
