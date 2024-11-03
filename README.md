@@ -64,7 +64,7 @@ Certifique-se de que o Maven e o Java estão corretamente instalados e configura
 
 ##Pipeline de Build
 A pipeline de Build foi configurada para compilar e empacotar a aplicação utilizando Maven. A configuração da pipeline está descrita abaixo:
-## Descrição do Problema e Solução
+
 trigger:
   main
 
