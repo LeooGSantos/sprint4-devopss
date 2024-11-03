@@ -66,7 +66,7 @@ stages:
           - task: Docker@2
             displayName: 'Iniciar RabbitMQ'
             inputs:
-              containerRegistry: 'LeooGSantos'  # Usando a conexão de serviço do Docker Registry
+              containerRegistry: 'leozin1910'  # Usando a conexão de serviço do Docker Registry
               command: 'run'
               arguments: '-d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:4.0-management'
           
