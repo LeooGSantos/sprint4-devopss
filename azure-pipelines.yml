@@ -1,0 +1,19 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: Maven@3
+  inputs:
+    goals: 'clean install'
+    mavenPomFile: 'pom.xml'
+- task: Docker@2
+  inputs:
+    command: 'buildAndPush'
+    repository: 'my-docker-repo/my-image'
+    tags: |
+      $(Build.BuildId)
