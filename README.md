@@ -22,13 +22,13 @@
 
 * Java JDK 8 ou superior
 * Maven
-* Banco de dados (ex: MySQL, PostgreSQL)
+* Banco de dados: Oracle SQL Developer 
 
 **Passos:**
 
 1. **Clone o Repositório:**
    ```bash
-   git clone https://github.com/ErikTeixeira/java_challenge_.git
+   git clone https://github.com/LeooGSantos/sprint4-devopss.git
 
 2. **Configure o Banco de Dados:**
     * Crie um banco de dados e atualize as configurações de conexão no arquivo application.properties.
@@ -54,36 +54,172 @@ Para rodar os comandos acima no Windows, você pode usar o Prompt de Comando ou 
 Certifique-se de que o Maven e o Java estão corretamente instalados e configurados no seu PATH do Windows.
 
 
-
-## Diagramas
-
-**Diagrama da entity da Sprint:**
-    ![entity.png](documentacao/entity.png)
-**Diagrama repository da Sprint:**
-    ![repository.png](documentacao/repository.png)
-**Diagrama request e response da Sprint:**
-    ![request-response.png](documentacao/request-response.png)
-**Diagrama service da Sprint:**
-    ![service.png](documentacao/service.png)
-**Diagrama da controller da Sprint:**
-    ![controller.png](documentacao/controller.png)
-**Diagrama da Sprint:**
-    ![diagrama6.png](documentacao/diagrama6.png)
-
-
 ## Vídeo da Proposta Tecnológica
 
-**Link da Sprint 3:**
-    * https://youtu.be/lV95820MN6k
-**Link da Sprint 2:**
-    * https://youtu.be/JiGy_ohObWo
-
-**Link da Sprint 1:**
-    * https://youtu.be/0c4opnXL8fU
+**Link da Sprint 4:**
 
 
 
+## Configuração das Pipelines definidas na ferramenta Azure DevOps
+
+##Pipeline de Build
+A pipeline de Build foi configurada para compilar e empacotar a aplicação utilizando Maven. A configuração da pipeline está descrita abaixo:
 ## Descrição do Problema e Solução
+trigger:
+  main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
+  MAVEN_OPTS: '-Dmaven.repo.local=$(MAVEN_CACHE_FOLDER) -Xmx3072m'
+
+stages:
+  - stage: Build
+    jobs:
+      - job: MavenBuild
+        steps:
+          - task: JavaToolInstaller@0
+            inputs:
+              versionSpec: '17'
+              jdkArchitectureOption: 'x64'
+              jdkSourceOption: 'PreInstalled'
+
+          - task: Cache@2
+            displayName: 'Cache Maven packages'
+            inputs:
+              key: 'maven | "$(Agent.OS)" | pom.xml'
+              restoreKeys: 'maven | "$(Agent.OS)"'
+              path: $(MAVEN_CACHE_FOLDER)
+
+          - task: Maven@3
+            displayName: 'Build com o Maven'
+            inputs:
+              mavenPomFile: 'pom.xml'
+              mavenOptions: $(MAVEN_OPTS)
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: '1.17'
+              jdkArchitectureOption: 'x64'
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              goals: 'package'
+
+          - task: CopyFiles@2
+            displayName: 'Copiar JAR para o diretório de staging'
+            inputs:
+              SourceFolder: '$(System.DefaultWorkingDirectory)/target'
+              Contents: '*.jar'
+              TargetFolder: $(Build.ArtifactStagingDirectory)
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publicar artefato: drop'
+            inputs:
+              PathtoPublish: $(Build.ArtifactStagingDirectory)
+              ArtifactName: 'drop'
+
+Pipeline de Build
+A pipeline de Build foi configurada para compilar e empacotar a aplicação utilizando Maven. A configuração da pipeline está descrita abaixo:
+trigger:
+  main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
+  MAVEN_OPTS: '-Dmaven.repo.local=$(MAVEN_CACHE_FOLDER) -Xmx3072m'
+
+stages:
+  - stage: Build
+    jobs:
+      - job: MavenBuild
+        steps:
+          - task: JavaToolInstaller@0
+            inputs:
+              versionSpec: '17'
+              jdkArchitectureOption: 'x64'
+              jdkSourceOption: 'PreInstalled'
+
+          - task: Cache@2
+            displayName: 'Cache Maven packages'
+            inputs:
+              key: 'maven | "$(Agent.OS)" | pom.xml'
+              restoreKeys: 'maven | "$(Agent.OS)"'
+              path: $(MAVEN_CACHE_FOLDER)
+
+          - task: Maven@3
+            displayName: 'Build com o Maven'
+            inputs:
+              mavenPomFile: 'pom.xml'
+              mavenOptions: $(MAVEN_OPTS)
+              javaHomeOption: 'JDKVersion'
+              jdkVersionOption: '1.17'
+              jdkArchitectureOption: 'x64'
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              goals: 'package'
+
+          - task: CopyFiles@2
+            displayName: 'Copiar JAR para o diretório de staging'
+            inputs:
+              SourceFolder: '$(System.DefaultWorkingDirectory)/target'
+              Contents: '*.jar'
+              TargetFolder: $(Build.ArtifactStagingDirectory)
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publicar artefato: drop'
+            inputs:
+              PathtoPublish: $(Build.ArtifactStagingDirectory)
+              ArtifactName: 'drop'
+            
+## Pipeline de Deploy
+A pipeline de Deploy foi configurada para realizar o deploy da aplicação no ambiente DevOps. Esta configuração inclui o uso do RabbitMQ e a execução da aplicação Spring Boot. Veja abaixo a configuração:
+stage: Deploy
+displayName: 'Deploy da Aplicação'
+dependsOn: Build
+condition: succeeded()
+jobs:
+  - deployment: DeployJob
+    displayName: 'Deploy para o servidor'
+    environment: DevOps-Sprint4
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - task: Docker@2
+              displayName: 'Iniciar RabbitMQ'
+              inputs:
+                containerRegistry: 'LeooGSantoss'
+                command: 'run'
+                arguments: '-d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:4.0-management'
+
+            - task: DownloadBuildArtifacts@1
+              inputs:
+                buildType: 'current'
+                downloadType: 'single'
+                artifactName: 'drop'
+                downloadPath: '$(System.ArtifactsDirectory)'
+
+            - task: Bash@3
+              displayName: 'Executar aplicativo Spring Boot'
+              inputs:
+                targetType: 'inline'
+                script: |
+                  # Aguardar o RabbitMQ iniciar
+                  sleep 30
+                  
+                  # Executar a aplicação Spring Boot com as variáveis de ambiente
+                  java -jar $(System.ArtifactsDirectory)/drop/*.jar \
+                    --spring.datasource.url=jdbc:oracle:thin:@$(DB_HOST):$(DB_PORT):$(DB_SERVICE_NAME) \
+                    --spring.datasource.username=$(DB_USER) \
+                    --spring.datasource.password=$(DB_PASSWORD) \
+                    --google.api.key=$(GOOGLE_API_KEY) &
+
+                  # Aguardar a aplicação iniciar
+                  sleep 30
+## Considerações Finais
+A configuração das pipelines foi realizada utilizando a ferramenta Azure DevOps, permitindo a automação do processo de build e deploy da aplicação TechPeach. A estrutura configurada garante uma implementação ágil e eficiente, assegurando que as atualizações na aplicação sejam integradas e disponibilizadas de maneira rápida e eficaz.
 
 ### Problema
 Planejar viagens pode ser um processo tedioso e desafiador, especialmente para encontrar atividades e locais que se alinhem com as preferências individuais dos viajantes.
