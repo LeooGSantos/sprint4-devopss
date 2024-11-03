@@ -1,19 +1,82 @@
 trigger:
-  branches:
-    include:
-      - main
+- main
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: ubuntu-latest
 
-steps:
-- task: Maven@3
-  inputs:
-    goals: 'clean install'
-    mavenPomFile: 'pom.xml'
-- task: Docker@2
-  inputs:
-    command: 'buildAndPush'
-    repository: 'my-docker-repo/my-image'
-    tags: |
-      $(Build.BuildId)
+variables:
+  MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
+  MAVEN_OPTS: '-Dmaven.repo.local=$(MAVEN_CACHE_FOLDER) -Xmx3072m'
+
+stages:
+- stage: Build
+  jobs:
+  - job: MavenBuild
+    steps:
+    - task: JavaToolInstaller@0
+      inputs:
+        versionSpec: '17'
+        jdkArchitectureOption: 'x64'
+        jdkSourceOption: 'packaged'  # Alterado para 'packaged'
+    - task: Cache@2
+      displayName: 'Cache Maven packages'
+      inputs:
+        key: 'maven | "$(Agent.OS)" | pom.xml'
+        restoreKeys: 'maven | "$(Agent.OS)"'
+        path: $(MAVEN_CACHE_FOLDER)
+    - task: Maven@3
+      displayName: 'Build com o Maven'
+      inputs:
+        mavenPomFile: 'pom.xml'
+        mavenOptions: $(MAVEN_OPTS)
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '17'
+        jdkArchitectureOption: 'x64'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        goals: 'package'
+    - task: CopyFiles@2
+      displayName: 'Copiar JAR para o diretório de staging'
+      inputs:
+        SourceFolder: '$(System.DefaultWorkingDirectory)/target'
+        Contents: '*.jar'
+        TargetFolder: $(Build.ArtifactStagingDirectory)
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publicar artefato: drop'
+      inputs:
+        PathtoPublish: $(Build.ArtifactStagingDirectory)
+        ArtifactName: 'drop'
+
+- stage: Deploy
+  displayName: 'Deploy da Aplicação'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployJob
+    displayName: 'Deploy para o servidor'
+    environment: DevOps-Sprint4
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: Docker@2
+            displayName: 'Iniciar RabbitMQ'
+            inputs:
+              containerRegistry: 'Docker Hub'
+              repository: 'rabbitmq'
+              tag: '4.0-management'
+              ports: |
+                5672:5672
+                15672:15672
+              runInBackground: true
+          - task: Bash@3
+            displayName: 'Executar aplicativo Spring Boot'
+            env:
+              SPRING_DATASOURCE_URL: jdbc:oracle:thin:@$(DB_HOST):$(DB_PORT):$(DB_SERVICE_NAME)
+              SPRING_DATASOURCE_USERNAME: $(DB_USER)
+              SPRING_DATASOURCE_PASSWORD: $(DB_PASSWORD)
+              GOOGLE_API_KEY: $(GOOGLE_API_KEY)
+            inputs:
+              targetType: 'inline'
+              script: |
+                java -jar $(Pipeline.Workspace)/**/*.jar &
