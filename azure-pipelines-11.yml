@@ -1,0 +1,25 @@
+trigger:
+- main  # Defina o branch que acionará o pipeline
+
+pool:
+  vmImage: 'ubuntu-latest'  # Imagem do agente que será usada
+
+steps:
+- task: JavaToolInstaller@0
+  inputs:
+    versionSpec: '11'  # Substitua pela versão desejada do JDK
+    jdkArchitectureOption: 'x64'  # Ou 'x86' se necessário
+    jdkSourceOption: 'LocalDirectory'  # Usando um diretório local
+    jdkFile: 'caminho/para/seu/jdk.tar.gz'  # Caminho para o arquivo do JDK
+    jdkDestinationDirectory: '$(Agent.ToolsDirectory)/jdk11'  # Diretório de destino para a instalação
+    cleanDestinationDirectory: true  # Limpa o diretório de destino antes de extrair
+
+- script: |
+    echo "JAVA_HOME is set to $(JAVA_HOME)"
+    java -version  # Verifica a versão do Java instalada
+  displayName: 'Verificar versão do Java'
+
+- script: |
+    echo "Construindo o projeto..."
+    # Comandos para construir seu projeto
+  displayName: 'Construir Projeto'
