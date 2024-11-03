@@ -58,7 +58,7 @@ Certifique-se de que o Maven e o Java estão corretamente instalados e configura
 
 **Link da Sprint 4:**
 
-
+https://youtu.be/2sq64TnREbo
 
 ## Configuração das Pipelines definidas na ferramenta Azure DevOps
 
