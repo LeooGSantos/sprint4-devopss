@@ -1,0 +1,32 @@
+# azure-pipelines.yml
+
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+- stage: Build
+  displayName: 'Build Stage'
+  jobs:
+  - job: Build
+    displayName: 'Build Job'
+    steps:
+    - task: JavaToolInstaller@0
+      inputs:
+        versionSpec: '17'
+        jdkArchitectureOption: 'x64'
+        jdkDirectory: '$(JAVA_HOME)'
+
+    - task: MavenAuthenticate@0
+      displayName: 'Authenticate Maven'
+
+    - task: Maven@3
+      displayName: 'Maven Build'
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean package'
+        options: '-DskipTests=true'
+        publishJUnitResults: true
+        testResultsFiles: '**/target/surefire-reports/*.xml'
