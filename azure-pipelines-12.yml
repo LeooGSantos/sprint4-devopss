@@ -1,0 +1,110 @@
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  DOCKER_REGISTRY: 'your-registry.azurecr.io'
+  IMAGE_NAME: 'techpeach'
+  IMAGE_TAG: '$(Build.BuildId)'
+
+services:
+  rabbitmq:
+    image: rabbitmq:4.0-management
+    ports:
+      - 5672:5672
+      - 15672:15672
+
+steps:
+- task: JavaToolInstaller@0
+  inputs:
+    versionSpec: '17'
+    jdkArchitectureOption: 'x64'
+    jdkSourceOption: 'PreInstalled'
+
+- task: MavenAuthenticate@0
+  inputs:
+    artifactsFeeds: ''
+    mavenServiceConnections: ''
+
+- task: Maven@3
+  inputs:
+    mavenPomFile: 'pom.xml'
+    goals: 'clean package'
+    publishJUnitResults: true
+    testResultsFiles: '**/surefire-reports/TEST-*.xml'
+    javaHomeOption: 'JDKVersion'
+    jdkVersionOption: '1.17'
+    mavenVersionOption: 'Default'
+    sonarQubeRunAnalysis: false
+  displayName: 'Build com Maven'
+
+- task: Docker@2
+  inputs:
+    containerRegistry: '$(DOCKER_REGISTRY)'
+    repository: '$(IMAGE_NAME)'
+    command: 'buildAndPush'
+    Dockerfile: '**/Dockerfile'
+    tags: |
+      $(IMAGE_TAG)
+      latest
+  displayName: 'Build e Push da Imagem Docker'
+
+- task: CopyFiles@2
+  inputs:
+    SourceFolder: '$(System.DefaultWorkingDirectory)'
+    Contents: |
+      **/*.jar
+      **/Dockerfile
+      **/docker-compose.yml
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'
+  displayName: 'Copiar Arquivos para Staging'
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'drop'
+    publishLocation: 'Container'
+  displayName: 'Publicar Artefatos'
+
+- task: AzureWebAppContainer@1
+  inputs:
+    azureSubscription: 'Your-Azure-Subscription'
+    appName: 'techpeach-app'
+    containers: '$(DOCKER_REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)'
+  displayName: 'Deploy para Azure Web App'
+
+- task: AzureAppServiceSettings@1
+  inputs:
+    azureSubscription: 'Your-Azure-Subscription'
+    appName: 'techpeach-app'
+    resourceGroupName: 'your-resource-group'
+    appSettings: |
+      [
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "production"
+        },
+        {
+          "name": "DB_DESENV_SERVER",
+          "value": "oracle.fiap.com.br"
+        },
+        {
+          "name": "DB_DESENV_PORT",
+          "value": "1521"
+        },
+        {
+          "name": "DB_DESENV_NAME",
+          "value": "ORCL"
+        },
+        {
+          "name": "SPRING_RABBITMQ_HOST",
+          "value": "localhost"
+        },
+        {
+          "name": "SPRING_RABBITMQ_PORT",
+          "value": "5672"
+        }
+      ]
+  displayName: 'Configurar App Settings'
